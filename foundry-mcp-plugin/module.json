@@ -2,11 +2,15 @@
   "id": "foundry-mcp-plugin",
   "title": "Foundry MCP Plugin",
   "description": "MCP bridge to connect FoundryVTT to Claude AI. The MCP server can run locally or on a remote host (NAS, VPS).",
+<<<<<<< Updated upstream
   "version": "2.0.4",
+=======
+  "version": "2.0.1",
+>>>>>>> Stashed changes
   "compatibility": {
     "minimum": "13",
-    "verified": "13.351",
-    "maximum": "13"
+    "verified": "14.363",
+    "maximum": "14"
   },
   "url": "https://github.com/Zorgonaute84/FoundryVTT-mcp-server-Plugin",
   "manifest": "https://raw.githubusercontent.com/Zorgonaute84/FoundryVTT-mcp-server-Plugin/main/foundry-mcp-plugin/module.json",
