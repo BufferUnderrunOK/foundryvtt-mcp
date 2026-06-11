@@ -762,7 +762,7 @@ class FoundryMCPPlugin {
       id: s.id, name: s.name,
       active: s.active, navigation: s.navigation, navName: s.navName,
       folder: s.folder?.name ?? null, folderId: s.folder?.id ?? null,
-      background: s.background?.src ?? null,
+      background: s.levels?.contents?.[0]?.background?.src ?? s.background?.src ?? null,
       width: s.width, height: s.height,
       grid: { type: s.grid?.type, size: s.grid?.size, units: s.grid?.units },
       darkness: s.darkness,
@@ -795,7 +795,25 @@ class FoundryMCPPlugin {
     const s = this._findScene(id, name);
     if (!s) throw new Error(`Scene not found: ${id || name}`);
     if (!data) throw new Error('Provide data with fields to update.');
-    await s.update(data);
+
+    // In Foundry V14, background image lives in the Level embedded document.
+    // Intercept background.src and route through updateEmbeddedDocuments.
+    const sceneData = {};
+    let bgSrc = undefined;
+    for (const [k, v] of Object.entries(data)) {
+      if (k === 'background' && typeof v === 'object' && v !== null && 'src' in v) {
+        bgSrc = v.src;
+      } else if (k === 'background.src') {
+        bgSrc = v;
+      } else {
+        sceneData[k] = v;
+      }
+    }
+    if (Object.keys(sceneData).length) await s.update(sceneData);
+    if (bgSrc !== undefined) {
+      const levelId = s.levels?.contents?.[0]?._id ?? 'defaultLevel0000';
+      await s.updateEmbeddedDocuments('Level', [{ _id: levelId, 'background.src': bgSrc }]);
+    }
     return { id: s.id, name: s.name, updated: true };
   }
 
