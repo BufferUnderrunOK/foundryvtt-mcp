@@ -273,6 +273,13 @@ class FoundryMCPPlugin {
         // Macros
         case 'listMacros':        result = this._listMacros(); break;
         case 'executeMacro':      result = await this._executeMacro(params ?? {}); break;
+        // Scenes
+        case 'listScenes':        result = this._listScenes(params ?? {}); break;
+        case 'getScene':          result = this._getScene(params ?? {}); break;
+        case 'createScene':       result = await this._createScene(params ?? {}); break;
+        case 'updateScene':       result = await this._updateScene(params ?? {}); break;
+        case 'deleteScene':       result = await this._deleteScene(params ?? {}); break;
+        case 'activateScene':     result = await this._activateScene(params ?? {}); break;
         default: throw new Error(`Unknown method: ${method}`);
       }
       this._respond(id, true, result);
@@ -724,6 +731,93 @@ class FoundryMCPPlugin {
     if (!macro.canExecute) throw new Error(`Cannot execute macro "${macro.name}" (insufficient permissions).`);
     await macro.execute();
     return { macroId: macro.id, macroName: macro.name, executed: true };
+  }
+
+  // ── Scenes ────────────────────────────────────────────────────────────────
+
+  _listScenes({ folder } = {}) {
+    let scenes = game.scenes?.contents ?? [];
+    if (folder) {
+      const f = game.folders?.find(f => f.type === 'Scene' && f.name === folder);
+      if (!f) return { scenes: [], warning: `Folder "${folder}" not found.` };
+      scenes = scenes.filter(s => s.folder?.id === f.id);
+    }
+    return {
+      total: scenes.length,
+      scenes: scenes.map(s => ({
+        id: s.id, name: s.name,
+        active: s.active, navigation: s.navigation, navName: s.navName,
+        folder: s.folder?.name ?? null, folderId: s.folder?.id ?? null,
+        background: s.background?.src ?? null,
+        width: s.width, height: s.height,
+        thumb: s.thumb ?? null,
+      })),
+    };
+  }
+
+  _getScene({ id, name } = {}) {
+    const s = this._findScene(id, name);
+    if (!s) throw new Error(`Scene not found: ${id || name}`);
+    return {
+      id: s.id, name: s.name,
+      active: s.active, navigation: s.navigation, navName: s.navName,
+      folder: s.folder?.name ?? null, folderId: s.folder?.id ?? null,
+      background: s.background?.src ?? null,
+      width: s.width, height: s.height,
+      grid: { type: s.grid?.type, size: s.grid?.size, units: s.grid?.units },
+      darkness: s.darkness,
+      fogExploration: s.fogExploration,
+      tokenVision: s.tokenVision,
+      globalLight: s.globalLight,
+      weather: s.weather ?? null,
+      thumb: s.thumb ?? null,
+      tokenCount: s.tokens?.size ?? 0,
+      noteCount: s.notes?.size ?? 0,
+      lightCount: s.lights?.size ?? 0,
+      wallCount: s.walls?.size ?? 0,
+    };
+  }
+
+  async _createScene({ name, folder, data } = {}) {
+    if (!name) throw new Error('Name is required.');
+    const sceneData = { name, ...(data || {}) };
+    if (folder) {
+      const f = game.folders?.find(f => f.type === 'Scene' && f.name === folder);
+      if (!f) throw new Error(`Folder "${folder}" not found.`);
+      sceneData.folder = f.id;
+    }
+    const s = await Scene.create(sceneData);
+    if (!s) throw new Error('Scene.create returned null.');
+    return { id: s.id, name: s.name, folder: s.folder?.name ?? null, created: true };
+  }
+
+  async _updateScene({ id, name, data } = {}) {
+    const s = this._findScene(id, name);
+    if (!s) throw new Error(`Scene not found: ${id || name}`);
+    if (!data) throw new Error('Provide data with fields to update.');
+    await s.update(data);
+    return { id: s.id, name: s.name, updated: true };
+  }
+
+  async _deleteScene({ id, name } = {}) {
+    const s = this._findScene(id, name);
+    if (!s) throw new Error(`Scene not found: ${id || name}`);
+    const info = { sceneId: s.id, sceneName: s.name };
+    await s.delete();
+    return { ...info, deleted: true };
+  }
+
+  async _activateScene({ id, name } = {}) {
+    const s = this._findScene(id, name);
+    if (!s) throw new Error(`Scene not found: ${id || name}`);
+    await s.activate();
+    return { id: s.id, name: s.name, active: true };
+  }
+
+  _findScene(id, name) {
+    if (id)   return game.scenes?.get(id)       ?? null;
+    if (name) return game.scenes?.getName(name) ?? null;
+    return null;
   }
 
   // ── Communication ─────────────────────────────────────────────────────────

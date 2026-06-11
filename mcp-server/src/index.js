@@ -495,6 +495,87 @@ function registerTools(server) {
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
     }
   );
+
+  // ── Scenes ───────────────────────────────────────────────────────────────────
+
+  server.tool('foundry_list_scenes',
+    'Lists all scenes in the Foundry world. Returns ID, name, active state, navigation, background, and dimensions.',
+    {
+      folder: z.string().optional().describe('Filter by folder name'),
+    },
+    async ({ folder } = {}) => {
+      const data = await queryFoundry('listScenes', { folder });
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.tool('foundry_get_scene',
+    'Retrieves full details of a scene: background, grid, darkness, vision settings, and embedded document counts.',
+    {
+      id:   z.string().optional().describe('Scene ID (preferred if known)'),
+      name: z.string().optional().describe('Scene name'),
+    },
+    async ({ id, name } = {}) => {
+      if (!id && !name) throw new Error('Provide id or name.');
+      const data = await queryFoundry('getScene', { id, name });
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.tool('foundry_create_scene',
+    'Creates a new scene in FoundryVTT.',
+    {
+      name:   z.string().describe('Scene name'),
+      folder: z.string().optional().describe('Destination folder name'),
+      data:   z.record(z.unknown()).optional().describe('Initial scene data (e.g. background.src, width, height, grid, darkness)'),
+    },
+    async ({ name, folder, data } = {}) => {
+      if (!name) throw new Error('Name is required.');
+      const result = await queryFoundry('createScene', { name, folder, data });
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool('foundry_update_scene',
+    'Updates the data of an existing scene (name, background, grid, darkness, weather, navigation, etc.).',
+    {
+      id:   z.string().optional().describe('Scene ID'),
+      name: z.string().optional().describe('Scene name'),
+      data: z.record(z.unknown()).describe('Fields to update (dot notation supported, e.g. {"darkness": 0.5, "background.src": "path/to/img.webp"})'),
+    },
+    async ({ id, name, data } = {}) => {
+      if (!id && !name) throw new Error('Provide id or name.');
+      if (!data) throw new Error('Provide data with fields to update.');
+      const result = await queryFoundry('updateScene', { id, name, data });
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool('foundry_delete_scene',
+    'Deletes a scene. Warning: this action is irreversible.',
+    {
+      id:   z.string().optional().describe('Scene ID'),
+      name: z.string().optional().describe('Scene name'),
+    },
+    async ({ id, name } = {}) => {
+      if (!id && !name) throw new Error('Provide id or name.');
+      const data = await queryFoundry('deleteScene', { id, name });
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.tool('foundry_activate_scene',
+    'Activates a scene, making it the currently viewed scene for all connected players.',
+    {
+      id:   z.string().optional().describe('Scene ID'),
+      name: z.string().optional().describe('Scene name'),
+    },
+    async ({ id, name } = {}) => {
+      if (!id && !name) throw new Error('Provide id or name.');
+      const data = await queryFoundry('activateScene', { id, name });
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+  );
 }
 
 // ─── HTTP Server ──────────────────────────────────────────────────────────────
