@@ -433,13 +433,14 @@ class FoundryMCPPlugin {
   async _createActor({ name, type, folder, data } = {}) {
     if (!name) throw new Error('Name is required.');
     if (!type) throw new Error('Type is required.');
-    const actorData = { name, type, system: data || {} };
+    const actorData = { name, type, ...(data || {}) };
     if (folder) {
       const f = game.folders?.find(f => f.type === 'Actor' && f.name === folder);
       if (!f) throw new Error(`Folder "${folder}" not found.`);
       actorData.folder = f.id;
     }
     const a = await Actor.create(actorData);
+    if (!a) throw new Error(`Actor.create returned null — system validation likely rejected the data for type "${type}". Check the Foundry console for validation errors.`);
     return { id: a.id, name: a.name, type: a.type, created: true };
   }
 
@@ -495,29 +496,67 @@ class FoundryMCPPlugin {
     };
   }
 
-  async _createItem({ name, type, folder, data } = {}) {
+  async _createItem({ name, type, folder, actorId, data } = {}) {
     if (!name) throw new Error('Name is required.');
     if (!type) throw new Error('Type is required.');
-    const itemData = { name, type, system: data || {} };
+    // Allow actorId to be passed inside data{} for clients with schema restrictions
+    if (!actorId && data && data.actorId) {
+      actorId = data.actorId;
+      delete data.actorId;
+    }
+    const itemData = { name, type, ...(data || {}) };
+    if (actorId) {
+      const actor = this._findActor(actorId, null);
+      if (!actor) throw new Error(`Actor not found: ${actorId}`);
+      const [item] = await actor.createEmbeddedDocuments('Item', [itemData]);
+      if (!item) throw new Error(`Embedded item creation failed for actor "${actor.name}".`);
+      return { id: item.id, name: item.name, type: item.type, actorId: actor.id, created: true };
+    }
     if (folder) {
       const f = game.folders?.find(f => f.type === 'Item' && f.name === folder);
       if (!f) throw new Error(`Folder "${folder}" not found.`);
       itemData.folder = f.id;
     }
     const item = await Item.create(itemData);
+    if (!item) throw new Error(`Item.create returned null for type "${type}".`);
     return { id: item.id, name: item.name, type: item.type, created: true };
   }
 
-  async _updateItem({ id, name, data } = {}) {
-    const item = this._findItem(id, name);
+  async _updateItem({ id, name, actorId, data } = {}) {
+    // Allow actorId inside data{} for schema-restricted clients
+    if (!actorId && data && data.actorId) {
+      actorId = data.actorId;
+      delete data.actorId;
+    }
+    let item;
+    if (actorId) {
+      const actor = this._findActor(actorId, null);
+      if (!actor) throw new Error(`Actor not found: ${actorId}`);
+      item = actor.items.get(id) ?? actor.items.find(i => i.name === name);
+      if (!item) throw new Error(`Embedded item not found on actor "${actor.name}": ${id || name}`);
+    } else {
+      item = this._findItem(id, name);
+    }
     if (!item) throw new Error(`Item not found: ${id || name}`);
     if (!data) throw new Error('Provide data with fields to update.');
     await item.update(data);
     return { id: item.id, name: item.name, updated: true };
   }
 
-  async _deleteItem({ id, name } = {}) {
-    const item = this._findItem(id, name);
+  async _deleteItem({ id, name, actorId, data } = {}) {
+    // Allow actorId inside data{} for schema-restricted clients
+    if (!actorId && data && data.actorId) {
+      actorId = data.actorId;
+    }
+    let item;
+    if (actorId) {
+      const actor = this._findActor(actorId, null);
+      if (!actor) throw new Error(`Actor not found: ${actorId}`);
+      item = actor.items.get(id) ?? actor.items.find(i => i.name === name);
+      if (!item) throw new Error(`Embedded item not found on actor "${actor.name}": ${id || name}`);
+    } else {
+      item = this._findItem(id, name);
+    }
     if (!item) throw new Error(`Item not found: ${id || name}`);
     const info = { itemId: item.id, itemName: item.name };
     await item.delete();

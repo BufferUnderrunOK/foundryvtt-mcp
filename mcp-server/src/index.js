@@ -299,17 +299,18 @@ function registerTools(server) {
   );
 
   server.tool('foundry_create_item',
-    'Creates a new item in the Foundry world.',
+    'Creates a new item in the Foundry world, or as an embedded item on an actor when actorId is provided.',
     {
-      name:   z.string().describe('Item name'),
-      type:   z.string().describe('Item type according to the system (e.g. weapon, spell, equipment)'),
-      folder: z.string().optional().describe('Destination folder name'),
-      data:   z.record(z.unknown()).optional().describe('Initial system data'),
+      name:    z.string().describe('Item name'),
+      type:    z.string().describe('Item type according to the system (e.g. weapon, spell, equipment)'),
+      folder:  z.string().optional().describe('Destination folder name (world items only)'),
+      actorId: z.string().optional().describe('Actor ID — when provided, creates the item as an embedded document on that actor instead of a world item'),
+      data:    z.record(z.unknown()).optional().describe('Initial item data (top-level fields; use system: {...} for system data)'),
     },
-    async ({ name, type, folder, data } = {}) => {
+    async ({ name, type, folder, actorId, data } = {}) => {
       if (!name) throw new Error('Name is required.');
       if (!type) throw new Error('Type is required.');
-      const result = await queryFoundry('createItem', { name, type, folder, data });
+      const result = await queryFoundry('createItem', { name, type, folder, actorId, data });
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     }
   );
@@ -330,15 +331,16 @@ function registerTools(server) {
   );
 
   server.tool('foundry_delete_item',
-    'Deletes an item from the world. Warning: this action is irreversible.',
+    'Deletes an item from the world, or an embedded item on an actor when actorId is provided in data. Warning: this action is irreversible.',
     {
       id:   z.string().optional().describe('Item ID'),
       name: z.string().optional().describe('Item name'),
+      data: z.record(z.unknown()).optional().describe('Optional payload — pass {actorId: "..."} to delete an embedded item on an actor'),
     },
-    async ({ id, name } = {}) => {
+    async ({ id, name, data } = {}) => {
       if (!id && !name) throw new Error('Provide id or name.');
-      const data = await queryFoundry('deleteItem', { id, name });
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      const result = await queryFoundry('deleteItem', { id, name, data });
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     }
   );
 
